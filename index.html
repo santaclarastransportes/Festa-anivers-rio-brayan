@@ -311,7 +311,17 @@ async function loadCloud(){
  credits=cloudCredits;balance=credits.reduce((n,c)=>n+(Number(c.valor)||0),0);refreshBank();
 }
 
-async function renderPendingUsers(){const box=document.getElementById('pendingUsers');if(!box||!isAdmin())return;try{const snap=await fbDb.collection('usuarios').where('status','==','aguardando').get();box.innerHTML=snap.empty?'<div class="empty">Nenhum cadastro aguardando.</div>':snap.docs.map(d=>{const u=d.data();return `<div class="reviewitem"><h4>${esc(u.nome||u.email||'Novo motorista')}</h4><p>${esc(u.email||'')}<br>Apelido: ${esc(u.apelidoJogo||'—')}<br>Telefone: ${esc(u.telefone||'—')}<br>Caminhão: ${esc(u.caminhao||'—')} · Cor: ${esc(u.corCaminhao||'—')}<br>Solicitado: ${esc(u.criadoEm||'')}</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="approveUser('${d.id}')">Aceitar motorista</button><button class="btn ghost" onclick="rejectUser('${d.id}')">Recusar</button></div></div>`}).join('');}catch(e){box.innerHTML='<div class="notice">Erro ao carregar cadastros: '+esc(e.message)+'</div>';}}
+async function renderPendingUsers(){
+ const box=document.getElementById('pendingUsers');
+ if(!box)return;
+ if(!isAdmin()){box.innerHTML='<div class="notice">A conta conectada não está marcada como administradora no Firebase (role: admin). Solicitações não podem ser exibidas.</div>';return;}
+ try{
+  // Busca documentos e filtra localmente para aceitar cadastros com status antigos/variados.
+  const snap=await fbDb.collection('usuarios').get();
+  const pending=snap.docs.filter(d=>{const u=d.data();const st=String(u.status||u.statusAprovacao||u.role||'').toLowerCase();return ['aguardando','pendente','pending','awaiting'].includes(st)||u.statusAprovacao==='pendente'||u.role==='pendente';});
+  box.innerHTML=pending.length===0?'<div class="empty">Nenhum cadastro pendente encontrado. Se você acabou de receber um cadastro, confira também as permissões de leitura da coleção usuarios no Firestore.</div>':pending.map(d=>{const u=d.data();return `<div class="reviewitem"><h4>${esc(u.nome||u.email||'Novo motorista')}</h4><p>${esc(u.email||'')}<br>Apelido: ${esc(u.apelidoJogo||'—')}<br>Telefone: ${esc(u.telefone||'—')}<br>Caminhão: ${esc(u.caminhao||'—')} · Cor: ${esc(u.corCaminhao||'—')}<br>Solicitado: ${esc(u.criadoEm||'')}</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="approveUser('${d.id}')">Aceitar motorista</button><button class="btn ghost" onclick="rejectUser('${d.id}')">Recusar</button></div></div>`}).join('');
+ }catch(e){box.innerHTML='<div class="notice">Falha ao consultar solicitações no Firebase. Verifique se as regras permitem que administradores leiam a coleção usuarios. Erro: '+esc(e.message)+'</div>';}
+}
 async function approveUser(id){if(!isAdmin())return alert('Acesso negado.');await fbDb.collection('usuarios').doc(id).update({role:'motorista',status:'aprovado',statusAprovacao:'aprovado',ativo:true,aprovadoEm:new Date().toISOString(),aprovadoPor:uid()});await renderPendingUsers();alert('Cadastro aprovado. O motorista poderá entrar.');}
 async function rejectUser(id){if(!isAdmin())return alert('Acesso negado.');await fbDb.collection('usuarios').doc(id).update({role:'rejeitado',status:'rejeitado',statusAprovacao:'rejeitado',ativo:false,rejeitadoEm:new Date().toISOString(),rejeitadoPor:uid()});await renderPendingUsers();alert('Cadastro recusado.');}
 window.approveUser=approveUser;window.rejectUser=rejectUser;
