@@ -86,7 +86,7 @@
   <div class="stat"><small>Meu saldo no Banco</small><strong>€ 0</strong><em>Recompensas validadas</em></div>
   <div class="stat"><small>Viagens finalizadas</small><strong id="homeTrips">0</strong><em>Histórico de entregas</em></div>
   <div class="stat"><small>Minha posição</small><strong>—</strong><em>Ranking da divisão</em></div>
-  <div class="stat"><small>Status da conta</small><strong style="font-size:18px">Visitante</strong><em>Aguardando cadastro</em></div>
+  <div class="stat"><small>Status da conta</small><strong id="homeAccountRole" style="font-size:18px">Visitante</strong><em id="homeAccountStatus">Aguardando cadastro</em></div>
  </div>
  <div class="grid2"><div><div class="sectionhead"><h3>Comunicados da empresa</h3><span>Central oficial</span></div><div class="card"><div class="item" style="border:0;padding:0;background:none"><div><strong>Bem-vindo à Santa Clara Transportes</strong><small>As viagens serão registradas por comprovantes de imagem do jogo.</small></div><span class="tag goldtag">OFICIAL</span></div></div></div>
  <div><div class="sectionhead"><h3>Acesso rápido</h3><span>Explore a plataforma</span></div><div class="list"><div class="item"><div><strong>Iniciar uma viagem</strong><small>Envie o print da carga aceita</small></div><button class="btn secondary" onclick="go('cargas')">Abrir</button></div><div class="item"><div><strong>Ver Banco Santa Clara</strong><small>Consulte seu extrato</small></div><button class="btn secondary" onclick="go('banco')">Abrir</button></div></div></div></div>
@@ -310,17 +310,26 @@ let cloudReady=false, cloudUser=null, cloudProfile=null, cloudTrips=[];
 let cloudCredits=[];
 function renderDriverProfile(profile,user){
  const card=document.getElementById('driverProfileCard'),notice=document.getElementById('profileStatusNotice');
- if(!profile||!user){card.style.display='none';notice.style.display='block';notice.textContent='Faça login para visualizar seu perfil.';return;}
- const status=profile.status||profile.statusAprovacao||'—';
- notice.style.display='block';notice.textContent='Perfil carregado da sua conta. Seus dados foram enviados no cadastro e permanecem salvos após aprovação.';
- card.style.display='block';
+ const roleEl=document.getElementById('homeAccountRole'),statusEl=document.getElementById('homeAccountStatus');
+ if(!profile||!user){
+  card.style.display='none';notice.style.display='block';notice.textContent='Faça login para visualizar seu perfil.';
+  if(roleEl)roleEl.textContent='Visitante';if(statusEl)statusEl.textContent='Aguardando cadastro';return;
+ }
+ const role=String(profile.role||'').toLowerCase(),status=String(profile.status||profile.statusAprovacao||'').toLowerCase();
+ const isApproved=role==='motorista'||status==='aprovado'||profile.ativo===true;
+ const roleLabel=role==='admin'?'Administrador':isApproved?'Motorista':role==='rejeitado'||status==='rejeitado'?'Cadastro recusado':'Visitante';
+ const statusLabel=role==='admin'?'Acesso administrativo':isApproved?'Cadastro aprovado':role==='rejeitado'||status==='rejeitado'?'Solicitação recusada':'Aguardando aprovação';
+ if(roleEl)roleEl.textContent=roleLabel;if(statusEl)statusEl.textContent=statusLabel;
+ notice.style.display='block';notice.textContent=isApproved?'Cadastro aprovado. Seu perfil de motorista está ativo e seus dados permanecem salvos.':'Dados da conta carregados.';
+ card.style.display=isApproved?'block':'none';
+ if(!isApproved)return;
  document.getElementById('profileFullName').textContent=profile.nome||'—';
  document.getElementById('profileGameName').textContent=profile.apelidoJogo||'—';
  document.getElementById('profileEmail').textContent=profile.email||user.email||'—';
  document.getElementById('profilePhone').textContent=profile.telefone||'—';
  document.getElementById('profileTruck').textContent=profile.caminhao||'—';
  document.getElementById('profileTruckColor').textContent=profile.corCaminhao||'Não informado';
- document.getElementById('profileApprovalTag').textContent=String(status).toUpperCase();
+ document.getElementById('profileApprovalTag').textContent=roleLabel.toUpperCase();
 }
 
 const authStatus=document.getElementById('authStatus');
