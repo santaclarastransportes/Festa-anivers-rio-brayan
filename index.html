@@ -81,6 +81,7 @@
 
 <section class="page" id="admin"><div class="pageintro"><h2>Administração</h2><p>Central de gestão da Santa Clara Transportes.</p></div><div class="notice">A área administrativa será protegida por autenticação e permissões reais do Firebase. Nesta prévia, os controles são demonstrativos e não autorizam acesso administrativo.</div><div class="grid2"><div class="card"><div class="eyebrow">EQUIPE</div><h3>Solicitações de cadastro</h3><p class="muted" style="font-size:12px">Analisar, aprovar ou recusar novos motoristas.</p></div><div class="card"><div class="eyebrow">OPERAÇÃO</div><h3>Validação de cargas</h3><p class="muted" style="font-size:12px">Conferir prints de início e entrega, origem, destino e recompensa.</p></div><div class="card"><div class="eyebrow">FINANCEIRO</div><h3>Banco Santa Clara</h3><p class="muted" style="font-size:12px">Auditar créditos, estornos e histórico de recompensas.</p></div><div class="card"><div class="eyebrow">COMUNIDADE</div><h3>Ranking e loja</h3><p class="muted" style="font-size:12px">Gerenciar classificações e itens disponíveis.</p></div></div><div class="sectionhead"><h3>Fila de validação (demonstração local)</h3><span>Não é sincronizada</span></div><div id="adminQueue" class="empty">Nenhuma entrega aguardando validação.</div></section>
 </main></div>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 const titles={inicio:"Painel principal",cargas:"Cargas e viagens",banco:"Banco Santa Clara",ranking:"Ranking",loja:"Loja Santa Clara",perfil:"Área do motorista",admin:"Administração"};
 let trips=[];let balance=0;let credits=[];
@@ -135,7 +136,7 @@ function detectCargoType(img){
 async function readStartPrint(){
  const file=document.getElementById('startImage').files[0];
  if(!file){setOcrStatus('Primeiro, selecione o print da carga.');return;}
- if(!window.Tesseract){setOcrStatus('Não foi possível carregar o leitor de imagens. Verifique a internet e tente novamente.');return;}
+ if(!window.Tesseract){setOcrStatus('O leitor OCR não carregou (Tesseract.js). Confira a conexão, recarregue o site e tente novamente. Se persistir, preencha origem, destino e tipo de carga manualmente.');return;}
  const img=document.getElementById('startPreview');
  if(!img.complete || !img.naturalWidth){await new Promise(resolve=>{img.onload=resolve;});}
  setOcrStatus('Analisando o print... isso pode levar alguns segundos.');
