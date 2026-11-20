@@ -142,7 +142,7 @@ async function readStartPrint(){
  setOcrStatus('Analisando o print... isso pode levar alguns segundos.');
  const btn=document.getElementById('readPrintBtn');btn.disabled=true;
  try{
-  if(!ocrWorker)ocrWorker=await Tesseract.createWorker('por+eng',1,{logger:m=>{if(m.status==='recognizing text')setOcrStatus('Lendo o print: '+Math.round((m.progress||0)*100)+'%');}});
+  if(!ocrWorker)ocrWorker=await Tesseract.createWorker('por', 1, {logger:m=>{if(m.status==='recognizing text')setOcrStatus('Lendo o print: '+Math.round((m.progress||0)*100)+'%');}, workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js', corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js', langPath:'https://tessdata.projectnaptha.com/4.0.0'});
   const result=await ocrWorker.recognize(file);
   const text=result.data.text||'';
   const route=extractRoute(text);
@@ -161,7 +161,7 @@ async function readStartPrint(){
    setOcrStatus('Print lido! Origem, destino e tipo de carga foram preenchidos. Confira os dados antes de registrar.','success');
   }
  }catch(err){
-  console.error(err);setOcrStatus('Falha ao ler o print. Confira sua conexão e tente novamente ou preencha os campos manualmente.','notice');
+  console.error('Erro OCR detalhado:',err);setOcrStatus('Falha no leitor OCR: '+(err&&err.message?err.message:'erro desconhecido')+'. Tente novamente ou preencha manualmente.','notice');
  }finally{btn.disabled=false;}
 }
 document.getElementById('startImage').addEventListener('change',()=>{if(document.getElementById('startImage').files[0])readStartPrint();});
