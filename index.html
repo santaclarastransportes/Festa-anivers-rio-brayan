@@ -44,6 +44,20 @@
 .applicant-time{color:#8b9b90;font-size:10px;margin-top:12px}
 @media(max-width:650px){.applicant-card{padding:13px}.applicant-top{flex-direction:column;align-items:flex-start}.applicant-grid{gap:7px}.applicant-data{padding:9px}.applicant-actions{flex-direction:column}.applicant-actions button{width:100%}}
 
+
+/* Gerenciamento de motoristas */
+.driver-manage-list{display:grid;gap:13px;margin-top:14px}
+.driver-manage-card{border:1px solid #2d4534;border-radius:15px;background:linear-gradient(150deg,#14231a,#0c1510);padding:15px}
+.driver-manage-card .driver-manage-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.driver-manage-card .driver-manage-head strong{font-size:14px;overflow-wrap:anywhere}
+.driver-manage-card .driver-edit-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.driver-manage-card label{display:grid;gap:6px;font-size:10px;color:#9aa99e}
+.driver-manage-card input{width:100%;border:1px solid #2a3a30;background:#0a120d;color:#f3f6f2;border-radius:9px;padding:11px;min-width:0}
+.driver-manage-card .driver-edit-actions{display:flex;gap:9px;margin-top:12px}
+.driver-manage-card .driver-edit-actions button{flex:1;min-height:42px}
+.driver-manage-card .delete-driver{background:#261616;border:1px solid #603333;color:#ffc0c0}
+@media(max-width:650px){.driver-manage-card{padding:12px}.driver-manage-card .driver-edit-grid{grid-template-columns:1fr}.driver-manage-card .driver-edit-actions{flex-direction:column}.driver-manage-card .driver-edit-actions button{width:100%}}
+
 </style>
 </head>
 <body>
@@ -115,7 +129,7 @@
 
 <section class="page" id="perfil"><div class="pageintro"><h2>Meu perfil</h2><p>Seus dados de motorista, preenchidos no cadastro inicial, ficam salvos aqui após a aprovação administrativa.</p></div><div id="profileStatusNotice" class="notice">Faça login para visualizar seu perfil.</div><div class="card" id="driverProfileCard" style="display:none"><div class="sectionhead" style="margin-top:0"><h3>Dados do motorista</h3><span class="tag" id="profileApprovalTag">APROVADO</span></div><div class="formgrid"><div class="field"><label>Nome completo</label><div class="item"><strong id="profileFullName">—</strong></div></div><div class="field"><label>Apelido no jogo</label><div class="item"><strong id="profileGameName">—</strong></div></div><div class="field"><label>E-mail</label><div class="item"><strong id="profileEmail">—</strong></div></div><div class="field"><label>Telefone / WhatsApp</label><div class="item"><strong id="profilePhone">—</strong></div></div><div class="field"><label>Modelo do caminhão</label><div class="item"><strong id="profileTruck">—</strong></div></div><div class="field"><label>Cor do caminhão</label><div class="item"><strong id="profileTruckColor">—</strong></div></div></div><p class="muted" style="font-size:11px;margin-top:14px">Esses dados são os mesmos enviados no pedido de cadastro. Não é necessário preencher novamente.</p></div></section>
 
-<section class="page" id="admin"><div class="pageintro"><h2>Administração</h2><p>Central de gestão da Santa Clara Transportes.</p></div><div class="notice">Painel administrativo conectado ao Firebase. As solicitações abaixo são carregadas da coleção usuarios.</div><div class="card"><div class="eyebrow">EQUIPE</div><h3>Solicitações de cadastro</h3><p class="muted" style="font-size:12px">Analisar, aprovar ou recusar novos motoristas.</p><div id="pendingUsers" class="empty">Carregando solicitações...</div></div><div class="grid2"><div class="card"><div class="eyebrow">OPERAÇÃO</div><h3>Validação de cargas</h3><p class="muted" style="font-size:12px">Conferir prints de início e entrega, origem, destino e recompensa.</p></div><div class="card"><div class="eyebrow">FINANCEIRO</div><h3>Banco Santa Clara</h3><p class="muted" style="font-size:12px">Auditar créditos, estornos e histórico de recompensas.</p></div><div class="card"><div class="eyebrow">COMUNIDADE</div><h3>Ranking e loja</h3><p class="muted" style="font-size:12px">Gerenciar classificações e itens disponíveis.</p></div></div><div class="sectionhead"><h3>Fila de validação (demonstração local)</h3><span>Não é sincronizada</span></div><div id="adminQueue" class="empty">Nenhuma entrega aguardando validação.</div></section>
+<section class="page" id="admin"><div class="pageintro"><h2>Administração</h2><p>Central de gestão da Santa Clara Transportes.</p></div><div class="notice">Painel administrativo conectado ao Firebase. As solicitações abaixo são carregadas da coleção usuarios.</div><div class="card"><div class="eyebrow">EQUIPE</div><h3>Solicitações de cadastro</h3><p class="muted" style="font-size:12px">Analisar, aprovar ou recusar novos motoristas.</p><div id="pendingUsers" class="empty">Carregando solicitações...</div></div><div class="card" style="margin-top:15px"><div class="eyebrow">GESTÃO DA EQUIPE</div><h3>Gerenciar motoristas</h3><p class="muted" style="font-size:12px">Edite nome, apelido e telefone dos motoristas aprovados. Excluir remove perfil e registros vinculados do Firestore.</p><div class="notice">A exclusão do documento Firestore e dos registros vinculados não apaga a conta de autenticação Firebase (Auth). Para remover também a conta Auth é necessária uma função de servidor segura.</div><div id="managedDrivers" class="empty">Carregando motoristas...</div></div><div class="grid2"><div class="card"><div class="eyebrow">OPERAÇÃO</div><h3>Validação de cargas</h3><p class="muted" style="font-size:12px">Conferir prints de início e entrega, origem, destino e recompensa.</p></div><div class="card"><div class="eyebrow">FINANCEIRO</div><h3>Banco Santa Clara</h3><p class="muted" style="font-size:12px">Auditar créditos, estornos e histórico de recompensas.</p></div><div class="card"><div class="eyebrow">COMUNIDADE</div><h3>Ranking e loja</h3><p class="muted" style="font-size:12px">Gerenciar classificações e itens disponíveis.</p></div></div><div class="sectionhead"><h3>Fila de validação (demonstração local)</h3><span>Não é sincronizada</span></div><div id="adminQueue" class="empty">Nenhuma entrega aguardando validação.</div></section>
 </main></div>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -321,7 +335,7 @@ function isAdmin(){return cloudProfile?.role==='admin';}
 function fileData(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});}
 async function loadCloud(){
  if(!cloudUser||!cloudProfile)return;
- if(isAdmin()){const snap=await fbDb.collection('viagens').get();cloudTrips=snap.docs.map(d=>({...d.data(),id:d.id}));await renderPendingUsers();}
+ if(isAdmin()){const snap=await fbDb.collection('viagens').get();cloudTrips=snap.docs.map(d=>({...d.data(),id:d.id}));await renderPendingUsers();await renderManagedDrivers();}
  else {const snap=await fbDb.collection('viagens').where('motoristaId','==',uid()).get();cloudTrips=snap.docs.map(d=>({...d.data(),id:d.id}));}
  trips=cloudTrips;refreshTrips();
  const cs=await fbDb.collection('movimentacoes').where('motoristaId','==',uid()).get();cloudCredits=cs.docs.map(d=>d.data());
@@ -385,7 +399,7 @@ async function approveUser(id){
   if(!doc.exists)throw new Error('Cadastro não encontrado.');
   const u=doc.data();
   await fbDb.collection('usuarios').doc(id).update({role:'motorista',status:'aprovado',statusAprovacao:'aprovado',ativo:true,aprovadoEm:new Date().toISOString(),aprovadoPor:uid()});
-  await renderPendingUsers();
+  await renderPendingUsers();await renderManagedDrivers();
   const message=`Olá, ${u.nome||u.apelidoJogo||'motorista'}! Seu cadastro na Santa Clara Transportes foi APROVADO. Você já pode entrar no site e acessar seu perfil. Seja bem-vindo à equipe!`;
   const phone=whatsappNumber(u.telefone);
   if(phone){const url='https://wa.me/'+phone+'?text='+encodeURIComponent(message);if(waWindow)waWindow.location.href=url;else openWhatsApp(u.telefone,message);}
@@ -410,6 +424,45 @@ async function rejectUser(id){
  }catch(e){if(waWindow)waWindow.close();alert('Falha ao recusar cadastro: '+e.message);}
 }
 window.approveUser=approveUser;window.rejectUser=rejectUser;
+
+async function renderManagedDrivers(){
+ const box=document.getElementById('managedDrivers');if(!box)return;
+ if(!isAdmin()){box.innerHTML='<div class="notice">Área exclusiva do administrador.</div>';return;}
+ box.innerHTML='<div class="empty">Carregando motoristas...</div>';
+ try{
+  const snap=await fbDb.collection('usuarios').get();
+  const drivers=snap.docs.filter(d=>{const u=d.data();return (u.role==='motorista'||u.status==='aprovado'||u.statusAprovacao==='aprovado')&&u.role!=='admin'&&u.status!=='rejeitado';});
+  const refresh='<button class="btn ghost" onclick="renderManagedDrivers()" style="margin-bottom:12px">↻ Atualizar motoristas</button>';
+  if(!drivers.length){box.innerHTML=refresh+'<div class="empty">Nenhum motorista aprovado encontrado.</div>';return;}
+  const cards=drivers.map(d=>{const u=d.data();return `<article class="driver-manage-card"><div class="driver-manage-head"><strong>${esc(u.nome||'Motorista')}</strong><span class="tag">${esc(u.status||u.role||'Ativo')}</span></div><div class="driver-edit-grid"><label>Nome completo<input id="dm_name_${d.id}" value="${esc(u.nome||'')}" maxlength="100"></label><label>Apelido no jogo<input id="dm_nick_${d.id}" value="${esc(u.apelidoJogo||'')}" maxlength="60"></label><label>Celular / WhatsApp<input id="dm_phone_${d.id}" value="${esc(u.telefone||'')}" inputmode="tel" maxlength="25"></label><label>E-mail (somente leitura)<input value="${esc(u.email||'—')}" disabled></label></div><div class="driver-edit-actions"><button class="btn" onclick="saveManagedDriver('${d.id}')">Salvar alterações</button><button class="btn delete-driver" onclick="deleteManagedDriver('${d.id}')">Excluir conta</button></div></article>`;}).join('');
+  box.innerHTML=refresh+`<p class="muted" style="font-size:12px;text-align:center">Motoristas encontrados: ${drivers.length}</p><div class="driver-manage-list">${cards}</div>`;
+ }catch(e){box.innerHTML='<div class="notice">Erro ao carregar motoristas: '+esc(e.message)+'</div><button class="btn ghost" onclick="renderManagedDrivers()">Tentar novamente</button>';}
+}
+async function saveManagedDriver(id){
+ if(!isAdmin())return alert('Acesso exclusivo do administrador.');
+ const nome=document.getElementById('dm_name_'+id)?.value.trim(),apelidoJogo=document.getElementById('dm_nick_'+id)?.value.trim(),telefone=document.getElementById('dm_phone_'+id)?.value.trim();
+ if(!nome||!apelidoJogo||!telefone)return alert('Preencha nome, apelido e celular.');
+ try{await fbDb.collection('usuarios').doc(id).update({nome,apelidoJogo,telefone,alteradoPorAdminEm:new Date().toISOString(),alteradoPorAdmin:uid()});alert('Dados do motorista atualizados!');await renderManagedDrivers();}
+ catch(e){alert('Falha ao salvar: '+e.message);}
+}
+async function deleteManagedDriver(id){
+ if(!isAdmin())return alert('Acesso exclusivo do administrador.');
+ const docRef=fbDb.collection('usuarios').doc(id);const snap=await docRef.get();if(!snap.exists)return alert('Perfil não encontrado.');const u=snap.data();
+ if(u.role==='admin')return alert('Não é permitido excluir uma conta de administrador por esta tela.');
+ const typed=prompt(`ATENÇÃO: serão apagados o perfil Firestore e os registros de viagens e movimentações vinculados a ${u.nome||u.email||id}.\n\nIsso é irreversível. Digite EXCLUIR para confirmar:`);
+ if(typed!=='EXCLUIR')return;
+ try{
+  // Remove viagens e movimentações vinculadas ao UID em lotes abaixo do limite do Firestore.
+  for(const collectionName of ['viagens','movimentacoes']){
+   const related=await fbDb.collection(collectionName).where('motoristaId','==',id).get();
+   for(let i=0;i<related.docs.length;i+=450){const batch=fbDb.batch();related.docs.slice(i,i+450).forEach(d=>batch.delete(d.ref));await batch.commit();}
+  }
+  await docRef.delete();
+  alert('Perfil e registros vinculados foram excluídos do Firestore. A conta de login Firebase Auth permanece; a remoção dela exige uma função de servidor.');
+  await renderPendingUsers();await renderManagedDrivers();await loadCloud();
+ }catch(e){alert('Falha ao excluir registros: '+e.message+'\nVerifique as regras Firestore.');}
+}
+window.renderManagedDrivers=renderManagedDrivers;window.saveManagedDriver=saveManagedDriver;window.deleteManagedDriver=deleteManagedDriver;
 
 function renderAdminQueue(){const q=document.getElementById('adminQueue');if(!isAdmin()){q.innerHTML='<div class="empty">Acesso exclusivo do administrador.</div>';return;}const pend=cloudTrips.filter(t=>t.status==='Aguardando validação');q.innerHTML=pend.length?pend.map(t=>`<div class="reviewitem"><h4>${esc(t.origem||t.origin||'')} → ${esc(t.destino||t.destination||'')}</h4><p>Motorista: ${esc(t.motoristaNome||t.driver||'')} · ${esc(t.tipoCarga||t.type||'')}<br>Valor solicitado: € ${Number(t.reward||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}<br>Enviada: ${esc(t.finalizadaEm||'')}</p><div class="notice">Os prints originais não são armazenados. Revise os dados informados e os resultados das análises OCR antes de decidir.</div><div class="field" style="margin-top:12px"><label>Motivo (obrigatório para rejeitar)</label><input id="reject_${t.id}" placeholder="Explique o motivo da rejeição"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" onclick="cloudApprove('${t.id}')">Aprovar e creditar</button><button class="btn ghost" onclick="cloudReject('${t.id}')">Rejeitar</button></div></div>`).join(''):'<div class="empty">Nenhuma entrega aguardando validação.</div>';}
 async function cloudApprove(id){if(!isAdmin())return alert('Acesso negado.');const t=cloudTrips.find(x=>x.id===id);if(!t||t.status!=='Aguardando validação')return alert('Viagem não está pendente.');const amount=Number(t.reward);if(!Number.isFinite(amount)||amount<=0)return alert('Valor inválido.');const ref=fbDb.collection('viagens').doc(id);const creditRef=fbDb.collection('movimentacoes').doc();await fbDb.runTransaction(async tx=>{const doc=await tx.get(ref);if(!doc.exists||doc.data().status!=='Aguardando validação')throw new Error('Esta viagem já foi revisada.');tx.update(ref,{status:'Finalizada e creditada',aprovadaEm:new Date().toISOString(),aprovadaPor:uid()});tx.set(creditRef,{motoristaId:doc.data().motoristaId,motoristaNome:doc.data().motoristaNome||doc.data().driver,viagemId:id,rota:(doc.data().origem||doc.data().origin)+' → '+(doc.data().destino||doc.data().destination),valor:amount,tipo:'credito_viagem',criadoEm:new Date().toISOString(),administradorId:uid()});});await loadCloud();renderAdminQueue();alert('Viagem aprovada. Crédito registrado.');}
