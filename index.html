@@ -100,6 +100,32 @@ function cleanCity(s){
 function normalizeOCR(s){
  return (s||'').replace(/[|]/g,'I').replace(/\s+/g,' ').trim();
 }
+// Lista de referência de cidades/localidades conhecidas no mapa; fuzzy matching corrige OCR, não inventa rotas.
+const TOE3_CITIES=['Airolo','Tremola','Zurich','Zürich','Nancy','Frankfurt','Stuttgart','Tübingen','Tubingen','Munich','München','Nuremberg','Nürnberg','Prague','Praha','Linz','Lech','Milano','Milan','Gotthard','Salzburg','Vienna','Wien','Bratislava','Budapest','Brno','Zagreb','Maribor','Geneva','Bern','Luxembourg','Krakow','Ostrava','Paris','Amsterdam','Berlin','London','Rome','Marseille'];
+function cityNorm(s){return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z]/g,'');}
+function editDistance(a,b){let d=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){let prev=d[0];d[0]=i;for(let j=1;j<=b.length;j++){let old=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=old;}}return d[b.length];}
+function fuzzyCity(text){
+ const raw=cityNorm(text); if(!raw)return null; let best=null,score=99;
+ for(const city of TOE3_CITIES){const n=cityNorm(city);if(raw===n)return city;const dist=editDistance(raw,n);const threshold=n.length>=7?2:(n.length>=5?1:0);if(dist<=threshold&&dist<score){best=city;score=dist;}}
+ return best;
+}
+function findCitiesInOCR(text){
+ const chunks=(text||'').replace(/[|]/g,'I').split(/[\n\r\t,;:()\[\]{}<>→➜›»/\-]+/).map(x=>x.trim()).filter(x=>x.length>=3&&x.length<=24);
+ const hits=[];for(const chunk of chunks){const c=fuzzyCity(chunk);if(c&&!hits.some(x=>cityNorm(x)===cityNorm(c)))hits.push(c);}
+ // Test longer phrases and adjacent OCR tokens too, to recover names split across lines/words.
+ const words=(text||'').replace(/[|]/g,'I').match(/[A-Za-zÀ-ÿ]{3,}/g)||[];
+ for(let i=0;i<words.length;i++){for(let n=1;n<=2;n++){const phrase=words.slice(i,i+n).join(' ');const c=fuzzyCity(phrase);if(c&&!hits.some(x=>cityNorm(x)===cityNorm(c)))hits.push(c);}}
+ return hits;
+}
+function cityCorrectRoute(route,ocrText){
+ const hits=findCitiesInOCR(ocrText);if(!hits.length)return route;
+ if(route&&route[0]&&route[1])return [fuzzyCity(route[0])||route[0],fuzzyCity(route[1])||route[1]];
+ if(route){if(route[0])route[0]=fuzzyCity(route[0])||route[0];if(route[1])route[1]=fuzzyCity(route[1])||route[1];}
+ // Fill missing side only when exactly two distinct city hits were found in the OCR text.
+ if(hits.length===2){return route?[route[0]||hits[0],route[1]||hits[1]]:[hits[0],hits[1]];}
+ return route;
+}
+
 function extractRoute(text){
  const lines=(text||'').split(/\n+/).map(normalizeOCR).filter(Boolean);
  // Detect a pair of city names when OCR has retained a route separator.
@@ -180,6 +206,7 @@ async function readStartPrint(){
    const found=extractRoute(t);if(found&&((found[0]&&found[1])||found[1])){route=found;if(found[0]&&found[1])break;}
   }
   if(!route)route=extractRoute(combined);
+  route=cityCorrectRoute(route,combined);
   const type=detectCargoType(img);
   if(route){if(route[0])document.getElementById('origin').value=route[0];if(route[1])document.getElementById('destination').value=route[1];}
   if(type)document.getElementById('cargoType').value=type;
