@@ -26,6 +26,24 @@
 .shell{display:none}body.loggedin .shell{display:flex}body.loggedin #scGate{display:none}
 @media(max-width:650px){#scGate .logo{width:min(100%,300px);max-height:240px}}
 
+
+/* Cards premium para análise de cadastros */
+.applicant-list{display:grid;gap:14px;margin-top:14px}
+.applicant-card{background:linear-gradient(150deg,#14231a,#0c1510 75%);border:1px solid #2d4534;border-radius:17px;padding:17px;box-shadow:0 8px 24px #0002}
+.applicant-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.applicant-title{font-size:16px;font-weight:850;line-height:1.35;margin:0;overflow-wrap:anywhere}
+.applicant-sub{font-size:11px;color:var(--muted);margin-top:5px;overflow-wrap:anywhere}
+.applicant-status{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:30px;background:#302715;color:#e5c778;border:1px solid #5c4b27;font-size:10px;font-weight:800;white-space:nowrap}
+.applicant-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.applicant-data{border:1px solid #26382c;background:#0b140e;border-radius:11px;padding:10px;min-width:0}
+.applicant-data small{display:block;color:#829388;font-size:10px;margin-bottom:5px}
+.applicant-data strong{display:block;color:#e3ece5;font-size:12px;overflow-wrap:anywhere;line-height:1.45}
+.applicant-actions{display:flex;gap:9px;margin-top:14px}
+.applicant-actions button{flex:1;min-height:44px}
+.applicant-actions .reject-btn{background:#261616;border:1px solid #603333;color:#ffc0c0}
+.applicant-time{color:#8b9b90;font-size:10px;margin-top:12px}
+@media(max-width:650px){.applicant-card{padding:13px}.applicant-top{flex-direction:column;align-items:flex-start}.applicant-grid{gap:7px}.applicant-data{padding:9px}.applicant-actions{flex-direction:column}.applicant-actions button{width:100%}}
+
 </style>
 </head>
 <body>
@@ -311,31 +329,86 @@ async function loadCloud(){
  credits=cloudCredits;balance=credits.reduce((n,c)=>n+(Number(c.valor)||0),0);refreshBank();
 }
 
+function whatsappNumber(raw){
+ const digits=String(raw||'').replace(/\D/g,'');
+ if(!digits)return '';
+ if(digits.startsWith('55'))return digits;
+ return '55'+digits;
+}
+function formatRequestedDate(raw){
+ if(!raw)return 'Data não informada';
+ const d=new Date(raw);return Number.isNaN(d.getTime())?String(raw):d.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+}
+function openWhatsApp(phone,message){
+ const number=whatsappNumber(phone);
+ if(!number){alert('Cadastro atualizado, mas o número de WhatsApp não foi informado.');return;}
+ const url='https://wa.me/'+number+'?text='+encodeURIComponent(message);
+ window.open(url,'_blank');
+}
 async function renderPendingUsers(){
  const box=document.getElementById('pendingUsers');
  if(!box)return;
  if(!isAdmin()){box.innerHTML='<div class="notice">A conta conectada não está marcada como administradora (role: admin) no Firebase.</div>';return;}
  box.innerHTML='<div class="empty">Consultando solicitações no Firebase...</div>';
  try{
-  // Consulta a coleção completa para evitar diferenças entre status antigos e atuais.
   const snap=await fbDb.collection('usuarios').get();
   const pending=snap.docs.filter(d=>{
-   const u=d.data();
-   const role=String(u.role||'').toLowerCase();
-   const status=String(u.status||'').toLowerCase();
-   const approval=String(u.statusAprovacao||'').toLowerCase();
-   return role==='pendente' || status==='aguardando' || status==='pendente' || approval==='pendente' || approval==='aguardando' || status==='pending' || approval==='pending';
+   const u=d.data(),role=String(u.role||'').toLowerCase(),status=String(u.status||'').toLowerCase(),approval=String(u.statusAprovacao||'').toLowerCase();
+   return role==='pendente'||status==='aguardando'||status==='pendente'||approval==='pendente'||approval==='aguardando'||status==='pending'||approval==='pending';
   });
-  const refresh='<button class="btn ghost" onclick="renderPendingUsers()" style="margin-bottom:12px">Atualizar solicitações</button>';
-  const count='<p class="muted">Documentos na coleção usuarios: '+snap.size+' · Pendentes encontrados: '+pending.length+'</p>';
-  box.innerHTML=refresh+count+(pending.length===0?'<div class="empty">Nenhum cadastro pendente encontrado. Confira se o novo cadastro aparece na coleção usuarios no Firebase Console e se as regras foram publicadas.</div>':pending.map(d=>{
+  const refresh='<button class="btn ghost" onclick="renderPendingUsers()" style="margin-bottom:12px">↻ Atualizar solicitações</button>';
+  const count='<p class="muted" style="text-align:center;font-size:12px;margin:10px 0 16px">Total de perfis: '+snap.size+' · Pendentes: '+pending.length+'</p>';
+  if(!pending.length){box.innerHTML=refresh+count+'<div class="empty">Nenhuma solicitação pendente neste momento.</div>';return;}
+  const cards=pending.map(d=>{
    const u=d.data();
-   return `<div class="reviewitem"><h4>${esc(u.nome||u.email||'Novo motorista')}</h4><p>${esc(u.email||'')}<br>Apelido: ${esc(u.apelidoJogo||'—')}<br>Telefone: ${esc(u.telefone||'—')}<br>Caminhão: ${esc(u.caminhao||'—')} · Cor: ${esc(u.corCaminhao||'—')}<br>Status: ${esc(u.status||u.statusAprovacao||u.role||'—')}<br>Solicitado: ${esc(u.criadoEm||'')}</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="approveUser('${d.id}')">Aceitar motorista</button><button class="btn ghost" onclick="rejectUser('${d.id}')">Recusar</button></div></div>`;
-  }).join(''));
- }catch(e){box.innerHTML='<div class="notice">Erro ao consultar coleção usuarios: '+esc(e.message)+'<br>Confirme as regras Firestore publicadas e se esta conta tem role admin.</div><button class="btn ghost" onclick="renderPendingUsers()">Tentar novamente</button>';}
+   const phone=esc(u.telefone||'Não informado');
+   return `<article class="applicant-card">
+    <div class="applicant-top"><div><h4 class="applicant-title">${esc(u.nome||'Novo motorista')}</h4><div class="applicant-sub">${esc(u.email||'E-mail não informado')}</div></div><span class="applicant-status">● Aguardando análise</span></div>
+    <div class="applicant-grid">
+     <div class="applicant-data"><small>🎮 Apelido no jogo</small><strong>${esc(u.apelidoJogo||'—')}</strong></div>
+     <div class="applicant-data"><small>📱 Telefone / WhatsApp</small><strong>${phone}</strong></div>
+     <div class="applicant-data"><small>🚛 Caminhão</small><strong>${esc(u.caminhao||'—')}</strong></div>
+     <div class="applicant-data"><small>🎨 Cor predominante</small><strong>${esc(u.corCaminhao||'—')}</strong></div>
+    </div>
+    <div class="applicant-time">Pedido enviado: ${esc(formatRequestedDate(u.criadoEm))}</div>
+    <div class="applicant-actions"><button class="btn" onclick="approveUser('${d.id}')">✓ Aceitar motorista</button><button class="btn reject-btn" onclick="rejectUser('${d.id}')">✕ Recusar cadastro</button></div>
+   </article>`;
+  }).join('');
+  box.innerHTML=refresh+count+'<div class="applicant-list">'+cards+'</div>';
+ }catch(e){box.innerHTML='<div class="notice">Erro ao consultar coleção usuarios: '+esc(e.message)+'<br>Confirme as regras Firestore e se esta conta tem role admin.</div><button class="btn ghost" onclick="renderPendingUsers()">Tentar novamente</button>';}
 }
-async function approveUser(id){if(!isAdmin())return alert('Acesso negado.');try{await fbDb.collection('usuarios').doc(id).update({role:'motorista',status:'aprovado',statusAprovacao:'aprovado',ativo:true,aprovadoEm:new Date().toISOString(),aprovadoPor:uid()});await renderPendingUsers();alert('Cadastro aprovado. O motorista poderá entrar.');}catch(e){alert('Falha ao aprovar cadastro: '+e.message);}}
-async function rejectUser(id){if(!isAdmin())return alert('Acesso negado.');try{await fbDb.collection('usuarios').doc(id).update({role:'rejeitado',status:'rejeitado',statusAprovacao:'rejeitado',ativo:false,rejeitadoEm:new Date().toISOString(),rejeitadoPor:uid()});await renderPendingUsers();alert('Cadastro recusado.');}catch(e){alert('Falha ao recusar cadastro: '+e.message);}}
+async function approveUser(id){
+ if(!isAdmin())return alert('Acesso negado.');
+ const waWindow=window.open('about:blank','_blank');
+ try{
+  const doc=await fbDb.collection('usuarios').doc(id).get();
+  if(!doc.exists)throw new Error('Cadastro não encontrado.');
+  const u=doc.data();
+  await fbDb.collection('usuarios').doc(id).update({role:'motorista',status:'aprovado',statusAprovacao:'aprovado',ativo:true,aprovadoEm:new Date().toISOString(),aprovadoPor:uid()});
+  await renderPendingUsers();
+  const message=`Olá, ${u.nome||u.apelidoJogo||'motorista'}! Seu cadastro na Santa Clara Transportes foi APROVADO. Você já pode entrar no site e acessar seu perfil. Seja bem-vindo à equipe!`;
+  const phone=whatsappNumber(u.telefone);
+  if(phone){const url='https://wa.me/'+phone+'?text='+encodeURIComponent(message);if(waWindow)waWindow.location.href=url;else openWhatsApp(u.telefone,message);}
+  else {if(waWindow)waWindow.close();alert('Cadastro aprovado, mas não há telefone cadastrado para enviar WhatsApp.');}
+ }catch(e){if(waWindow)waWindow.close();alert('Falha ao aprovar cadastro: '+e.message);}
+}
+async function rejectUser(id){
+ if(!isAdmin())return alert('Acesso negado.');
+ const reason=prompt('Motivo da recusa (opcional):');if(reason===null)return;
+ const waWindow=window.open('about:blank','_blank');
+ try{
+  const doc=await fbDb.collection('usuarios').doc(id).get();
+  if(!doc.exists)throw new Error('Cadastro não encontrado.');
+  const u=doc.data();
+  await fbDb.collection('usuarios').doc(id).update({role:'rejeitado',status:'rejeitado',statusAprovacao:'rejeitado',ativo:false,rejeitadoEm:new Date().toISOString(),rejeitadoPor:uid(),motivoRejeicaoCadastro:reason.trim()});
+  await renderPendingUsers();
+  const reasonText=reason.trim()?` Motivo: ${reason.trim()}`:'';
+  const message=`Olá, ${u.nome||u.apelidoJogo||'motorista'}. Informamos que seu cadastro na Santa Clara Transportes foi REPROVADO.${reasonText} Se tiver dúvidas, entre em contato com a administração.`;
+  const phone=whatsappNumber(u.telefone);
+  if(phone){const url='https://wa.me/'+phone+'?text='+encodeURIComponent(message);if(waWindow)waWindow.location.href=url;else openWhatsApp(u.telefone,message);}
+  else {if(waWindow)waWindow.close();alert('Cadastro recusado, mas não há telefone cadastrado para enviar WhatsApp.');}
+ }catch(e){if(waWindow)waWindow.close();alert('Falha ao recusar cadastro: '+e.message);}
+}
 window.approveUser=approveUser;window.rejectUser=rejectUser;
 
 function renderAdminQueue(){const q=document.getElementById('adminQueue');if(!isAdmin()){q.innerHTML='<div class="empty">Acesso exclusivo do administrador.</div>';return;}const pend=cloudTrips.filter(t=>t.status==='Aguardando validação');q.innerHTML=pend.length?pend.map(t=>`<div class="reviewitem"><h4>${esc(t.origem||t.origin||'')} → ${esc(t.destino||t.destination||'')}</h4><p>Motorista: ${esc(t.motoristaNome||t.driver||'')} · ${esc(t.tipoCarga||t.type||'')}<br>Valor solicitado: € ${Number(t.reward||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}<br>Enviada: ${esc(t.finalizadaEm||'')}</p><div class="notice">Os prints originais não são armazenados. Revise os dados informados e os resultados das análises OCR antes de decidir.</div><div class="field" style="margin-top:12px"><label>Motivo (obrigatório para rejeitar)</label><input id="reject_${t.id}" placeholder="Explique o motivo da rejeição"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" onclick="cloudApprove('${t.id}')">Aprovar e creditar</button><button class="btn ghost" onclick="cloudReject('${t.id}')">Rejeitar</button></div></div>`).join(''):'<div class="empty">Nenhuma entrega aguardando validação.</div>';}
