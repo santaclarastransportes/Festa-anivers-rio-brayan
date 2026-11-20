@@ -97,30 +97,54 @@ function setOcrStatus(message,kind='notice'){
 function cleanCity(s){
  return (s||'').replace(/^[^A-Za-zÀ-ÿ]+|[^A-Za-zÀ-ÿ]+$/g,'').replace(/\s{2,}/g,' ').trim();
 }
+function normalizeOCR(s){
+ return (s||'').replace(/[|]/g,'I').replace(/\s+/g,' ').trim();
+}
 function extractRoute(text){
- const lines=text.split(/\n+/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
- // O OCR pode colocar "Destino" numa linha e as cidades na linha seguinte.
- for(let i=0;i<lines.length;i++){
-  const line=lines[i];
-  if(/destin/i.test(line)){
-   const rest=line.replace(/^.*?destin\w*/i,'').replace(/^[\s:|/.-]+/,'').trim();
-   const candidates=[rest, rest+' '+(lines[i+1]||''), lines[i+1]||''];
-   for(const candidate of candidates){
-    let m=candidate.match(/([A-ZÀ-ÿ][A-Za-zÀ-ÿ ]{1,24}?)\s*(?:>|→|›|»|-)\s*([A-ZÀ-ÿ][A-Za-zÀ-ÿ ]{1,24})/i);
-    if(m)return [cleanCity(m[1]),cleanCity(m[2])];
-    // Alguns prints mostram destino como texto simples, sem seta.
-    m=candidate.match(/(?:destin\w*\s*[:|-]?\s*)([A-ZÀ-ÿ][A-Za-zÀ-ÿ ]{2,22})/i);
-    if(m){const city=cleanCity(m[1]);if(city&&!/(distância|carga|normal|pesada|tempo)/i.test(city))return ['',city];}
-   }
-  }
- }
- // Busca pares de cidades separados por seta, hífen ou barra em qualquer linha.
+ const lines=(text||'').split(/\n+/).map(normalizeOCR).filter(Boolean);
+ // Detect a pair of city names when OCR has retained a route separator.
+ const pairPatterns=[
+  /([A-ZÀ-Ý][A-Za-zÀ-ÿ]{2,}(?:[ '\-][A-Za-zÀ-ÿ]{2,}){0,2})\s*(?:→|➜|>|›|»|\bto\b|\s-\s|\/ )\s*([A-ZÀ-Ý][A-Za-zÀ-ÿ]{2,}(?:[ '\-][A-Za-zÀ-ÿ]{2,}){0,2})/i,
+  /([A-ZÀ-Ý][A-Za-zÀ-ÿ]{2,})\s*[—–-]\s*([A-ZÀ-Ý][A-Za-zÀ-ÿ]{2,})/i
+ ];
+ const cleanCandidate=x=>cleanCity(x).replace(/\b(DISTANCIA|DESTINO|ORIGEM|CARGA|NORMAL|PESADA|TEMPO)\b/ig,'').trim();
  for(const line of lines){
-  const m=line.match(/([A-ZÀ-ÿ][A-Za-zÀ-ÿ ]{2,22}?)\s*(?:→|>|›|»|\/)\s*([A-ZÀ-ÿ][A-Za-zÀ-ÿ ]{2,22})/);
-  if(m&&!/(carga|normal|pesada|destino|distância)/i.test(m[1]+' '+m[2]))return [cleanCity(m[1]),cleanCity(m[2])];
+  for(const re of pairPatterns){const m=line.match(re);if(m){const a=cleanCandidate(m[1]),b=cleanCandidate(m[2]);if(a&&b&&!/carga|destino|distância/i.test(a+' '+b))return [a,b];}}
+ }
+ // Route labels may be split over multiple OCR lines; look for the destination label and its adjacent text.
+ for(let i=0;i<lines.length;i++){
+  if(/destin|origem|route|rota/i.test(lines[i])){
+   const block=lines.slice(Math.max(0,i-1),Math.min(lines.length,i+3)).join(' ');
+   for(const re of pairPatterns){const m=block.match(re);if(m){const a=cleanCandidate(m[1]),b=cleanCandidate(m[2]);if(a&&b)return [a,b];}}
+   const next=cleanCandidate(lines[i+1]||'');
+   if(next && next.length>=3 && next.length<=28 && !/dist|carga|normal|pesada|tempo|km|€|\d/i.test(next))return ['',next];
+  }
  }
  return null;
 }
+function makeOCRCanvases(img){
+ const canvases=[];
+ // Several preprocessing passes improve text recovery across different phone screenshots.
+ for(const mode of ['gray','contrast','binary']){
+  const c=document.createElement('canvas'),ctx=c.getContext('2d',{willReadFrequently:true});
+  c.width=img.naturalWidth*2;c.height=img.naturalHeight*2;ctx.drawImage(img,0,0,c.width,c.height);
+  const d=ctx.getImageData(0,0,c.width,c.height);
+  for(let i=0;i<d.data.length;i+=4){
+   const v=d.data[i]*.299+d.data[i+1]*.587+d.data[i+2]*.114;
+   let n=v;if(mode==='contrast')n=Math.max(0,Math.min(255,(v-110)*1.65+110));if(mode==='binary')n=v>155?255:0;
+   d.data[i]=d.data[i+1]=d.data[i+2]=n;
+  }
+  ctx.putImageData(d,0,0);canvases.push(c);
+ }
+ // Focused crops: route/city text usually appears in the left-lower and central-lower panels.
+ for(const r of [[0,.25,.62,.65],[0,.35,.72,.55],[.15,.25,.75,.65]]){
+  const c=document.createElement('canvas'),ctx=c.getContext('2d');
+  c.width=Math.max(1,Math.round(img.naturalWidth*r[2]*2));c.height=Math.max(1,Math.round(img.naturalHeight*r[3]*2));
+  ctx.drawImage(img,Math.round(img.naturalWidth*r[0]),Math.round(img.naturalHeight*r[1]),Math.round(img.naturalWidth*r[2]),Math.round(img.naturalHeight*r[3]),0,0,c.width,c.height);canvases.push(c);
+ }
+ return canvases;
+}
+
 function greenScore(ctx,x,y,w,h){
  const data=ctx.getImageData(x,y,w,h).data;let score=0,count=0;
  for(let i=0;i<data.length;i+=16){const r=data[i],g=data[i+1],b=data[i+2];if(g>r*1.12 && g>b*0.92 && g>75)score++;count++;}
@@ -141,41 +165,31 @@ function detectCargoType(img){
 async function readStartPrint(){
  const file=document.getElementById('startImage').files[0];
  if(!file){setOcrStatus('Primeiro, selecione o print da carga.');return;}
- if(!window.Tesseract){setOcrStatus('O leitor OCR não carregou (Tesseract.js). Confira a conexão, recarregue o site e tente novamente. Se persistir, preencha origem, destino e tipo de carga manualmente.');return;}
+ if(!window.Tesseract){setOcrStatus('O leitor OCR não carregou. Confira a conexão e tente novamente.');return;}
  const img=document.getElementById('startPreview');
- if(!img.complete || !img.naturalWidth){await new Promise(resolve=>{img.onload=resolve;});}
- setOcrStatus('Analisando o print... isso pode levar alguns segundos.');
+ if(!img.complete||!img.naturalWidth)await new Promise(resolve=>{img.onload=resolve;});
+ setOcrStatus('Preparando várias análises do print...');
  const btn=document.getElementById('readPrintBtn');btn.disabled=true;
  try{
-  if(!ocrWorker)ocrWorker=await Tesseract.createWorker('por', 1, {logger:m=>{if(m.status==='recognizing text')setOcrStatus('Lendo o print: '+Math.round((m.progress||0)*100)+'%');}, workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js', corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js', langPath:'https://tessdata.projectnaptha.com/4.0.0'});
-  // Aumenta e melhora contraste para tentar ler o painel de rota pequeno.
-  const sourceCanvas=document.createElement('canvas'),sourceCtx=sourceCanvas.getContext('2d');
-  sourceCanvas.width=img.naturalWidth*2;sourceCanvas.height=img.naturalHeight*2;
-  sourceCtx.drawImage(img,0,0,sourceCanvas.width,sourceCanvas.height);
-  const imageData=sourceCtx.getImageData(0,0,sourceCanvas.width,sourceCanvas.height);
-  for(let i=0;i<imageData.data.length;i+=4){const v=imageData.data[i]*0.299+imageData.data[i+1]*0.587+imageData.data[i+2]*0.114;const n=v>145?255:Math.max(0,v*0.65);imageData.data[i]=imageData.data[i+1]=imageData.data[i+2]=n;}
-  sourceCtx.putImageData(imageData,0,0);
-  const result=await ocrWorker.recognize(sourceCanvas);
-  const text=result.data.text||'';
-  const route=extractRoute(text);
+  if(!ocrWorker)ocrWorker=await Tesseract.createWorker('por+eng',1,{logger:m=>{if(m.status==='recognizing text')setOcrStatus('Analisando imagem: '+Math.round((m.progress||0)*100)+'%');},workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js',langPath:'https://tessdata.projectnaptha.com/4.0.0'});
+  await ocrWorker.setParameters({preserve_interword_spaces:'1'});
+  const canvases=makeOCRCanvases(img);let combined='',route=null;
+  for(let i=0;i<canvases.length;i++){
+   setOcrStatus('Passagem '+(i+1)+' de '+canvases.length+' — procurando origem e destino...');
+   const res=await ocrWorker.recognize(canvases[i]);const t=res.data.text||'';combined+='\n'+t;
+   const found=extractRoute(t);if(found&&((found[0]&&found[1])||found[1])){route=found;if(found[0]&&found[1])break;}
+  }
+  if(!route)route=extractRoute(combined);
   const type=detectCargoType(img);
-  if(route){
-   if(route[0])document.getElementById('origin').value=route[0];
-   if(route[1])document.getElementById('destination').value=route[1];
-  }
+  if(route){if(route[0])document.getElementById('origin').value=route[0];if(route[1])document.getElementById('destination').value=route[1];}
   if(type)document.getElementById('cargoType').value=type;
-  const missing=[];
-  if(!route)missing.push('origem e destino');
-  if(!type)missing.push('tipo de carga');
-  if(missing.length){
-   setOcrStatus('Leitura parcial. Não consegui identificar '+missing.join(' e ')+'. Confira o print e preencha os campos manualmente.','notice');
-  }else{
-   setOcrStatus('Print lido! Origem, destino e tipo de carga foram preenchidos. Confira os dados antes de registrar.','success');
-  }
- }catch(err){
-  console.error('Erro OCR detalhado:',err);setOcrStatus('Falha no leitor OCR: '+(err&&err.message?err.message:'erro desconhecido')+'. Tente novamente ou preencha manualmente.','notice');
- }finally{btn.disabled=false;}
+  const missing=[];if(!route||!route[0])missing.push('origem');if(!route||!route[1])missing.push('destino');if(!type)missing.push('tipo de carga');
+  if(missing.length)setOcrStatus('Leitura parcial. Não consegui confirmar '+missing.join(', ')+'. Confira e corrija os campos manualmente.','notice');
+  else setOcrStatus('Leitura concluída em várias passagens. Confira origem, destino e tipo de carga antes de registrar.','success');
+ }catch(err){console.error('OCR:',err);setOcrStatus('Falha na análise: '+(err?.message||'erro desconhecido')+'. Preencha manualmente.','notice');}
+ finally{btn.disabled=false;}
 }
+
 document.getElementById('startImage').addEventListener('change',()=>{if(document.getElementById('startImage').files[0])readStartPrint();});
 document.getElementById('readPrintBtn').addEventListener('click',readStartPrint);
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
