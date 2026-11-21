@@ -286,8 +286,8 @@ async function readStartPrint(){
   if(type)document.getElementById('cargoType').value=type;
   const missing=[];if(!route||!route[0])missing.push('origem');if(!route||!route[1])missing.push('destino');if(!type)missing.push('tipo de carga');
   const labels=countTerms(combined,['carga','peso total','destino','distancia','renda','tempo']);const specs=countTerms(combined,['chassis','contagem de marchas','retardatario','eixos alimentados','poder do motor','torque']);
-  if(missing.length||labels<4||specs<3){startPrintValid=false;startOCRFields=null;setOcrStatus('PRINT RECUSADO: não corresponde à tela de armazenar carga do jogo. Selecione o print original correto.','notice');}
-  else {startPrintValid=true;startOCRFields={origem:route[0],destino:route[1],tipoCarga:type,formatoVerificado:true};document.getElementById('startForm').dataset.printVerified='true';setOcrStatus('Print de início aceito: formato do jogo reconhecido.','success');}
+  if(missing.length){startPrintValid=false;startOCRFields=null;setOcrStatus('Não consegui identificar todos os dados principais (origem, destino e tipo de carga). Confira os campos e tente ler novamente.','notice');}
+  else {startPrintValid=true;startOCRFields={origem:route[0],destino:route[1],tipoCarga:type,formatoVerificado:true,ocrTexto:combined};document.getElementById('startForm').dataset.printVerified='true';setOcrStatus('Print de início aceito: origem, destino e carga identificados.','success');}
 
  }catch(err){console.error('OCR:',err);setOcrStatus('Falha na análise: '+(err?.message||'erro desconhecido')+'. Preencha manualmente.','notice');}
  finally{btn.disabled=false;}
