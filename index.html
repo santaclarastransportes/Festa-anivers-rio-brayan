@@ -165,9 +165,27 @@ function screenRatioOk(img){return !!(img&&img.naturalWidth>0&&img.naturalHeight
 async function waitPreviewImage(img){if(!img)return false;if(img.complete&&img.naturalWidth>0)return true;return await new Promise(resolve=>{const done=()=>resolve(img.naturalWidth>0);img.addEventListener('load',done,{once:true});img.addEventListener('error',()=>resolve(false),{once:true});});}
 function countTerms(text,terms){const n=normalizeOCR(text).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();return terms.filter(t=>n.includes(t)).length;}
 function parseGameNumber(raw){if(!raw)return NaN;let s=String(raw).replace(/[^0-9.,-]/g,'').trim();if(!s)return NaN;if(s.includes(',')&&s.includes('.'))s=s.replace(/\./g,'').replace(',', '.');else if(s.includes(','))s=s.replace(',', '.');else if(/\.\d{3}$/.test(s))s=s.replace(/\./g,'');return Number(s);}
-function extractFinishValues(text){const norm=(text||'').replace(/\r/g,'');const lines=norm.split(/\n+/).map(x=>x.trim()).filter(Boolean);let km=NaN,reward=NaN;
- for(let i=0;i<lines.length;i++){const l=lines[i];if(/dist[aãâ]ncia\s*(?:acionada|percorrida|total)?/i.test(l)){let m=l.match(/([0-9]+(?:[.,][0-9]+)?)\s*(?:km|kms)?/i);if(!m){m=(lines.slice(i,i+3).join(' ').match(/([0-9]+(?:[.,][0-9]+)?)\s*(?:km|kms)?/i));}if(m)km=parseGameNumber(m[1]);}
- if(/renda\s*total/i.test(l)){let m=l.match(/(?:renda\s*total)[^0-9]{0,18}([0-9][0-9.,]*)/i);if(!m)m=lines.slice(i,i+3).join(' ').match(/([0-9][0-9.,]*)/);if(m)reward=parseGameNumber(m[1]);}}
+function extractFinishValues(text){
+ const lines=(text||'').replace(/\r/g,'').split(/\n+/).map(x=>x.trim()).filter(Boolean);let km=NaN,reward=NaN;
+ const numberRe='([0-9][0-9.,]*)';
+ for(let i=0;i<lines.length;i++){
+  const l=lines[i],near=lines.slice(i,i+4).join(' ');
+  if(/dist[aãâ]ncia|kilomet|\bkm\b/i.test(l)){
+   let m=l.match(new RegExp(numberRe+'\\s*(?:km|kms)?','i'));
+   if(!m)m=near.match(new RegExp(numberRe+'\\s*(?:km|kms)','i'));
+   if(!m)m=near.match(new RegExp('dist[aãâ]ncia[^0-9]{0,35}'+numberRe,'i'));
+   if(m) {const v=parseGameNumber(m[m.length-1]);if(Number.isFinite(v)&&v>0)km=v;}
+  }
+  if(/renda\s*total|reward|recompensa|€|eur/i.test(l)){
+   let m=l.match(new RegExp('(?:renda\\s*total|reward|recompensa|€|eur)[^0-9]{0,35}'+numberRe,'i'));
+   if(!m)m=near.match(new RegExp('(?:renda\\s*total|reward|recompensa|€|eur)[^0-9]{0,45}'+numberRe,'i'));
+   if(!m&&/renda\s*total/i.test(l))m=near.match(new RegExp(numberRe));
+   if(m){const v=parseGameNumber(m[m.length-1]);if(Number.isFinite(v)&&v>0)reward=v;}
+  }
+ }
+ // Fallback global: nos prints, os valores podem aparecer sem o rótulo na mesma linha OCR.
+ if(!Number.isFinite(km)){const m=(text||'').match(new RegExp('([0-9]+(?:[.,][0-9]+)?)\\s*km','i'));if(m)km=parseGameNumber(m[1]);}
+ if(!Number.isFinite(reward)){const m=(text||'').match(/€\s*([0-9][0-9.,]*)/i);if(m)reward=parseGameNumber(m[1]);}
  return {km,reward};
 }
 function cleanCity(s){
@@ -286,8 +304,20 @@ async function readStartPrint(){
   if(type)document.getElementById('cargoType').value=type;
   const missing=[];if(!route||!route[0])missing.push('origem');if(!route||!route[1])missing.push('destino');if(!type)missing.push('tipo de carga');
   const labels=countTerms(combined,['carga','peso total','destino','distancia','renda','tempo']);const specs=countTerms(combined,['chassis','contagem de marchas','retardatario','eixos alimentados','poder do motor','torque']);
-  if(missing.length){startPrintValid=false;startOCRFields=null;setOcrStatus('Não consegui identificar todos os dados principais (origem, destino e tipo de carga). Confira os campos e tente ler novamente.','notice');}
-  else {startPrintValid=true;startOCRFields={origem:route[0],destino:route[1],tipoCarga:type,formatoVerificado:true,ocrTexto:combined};document.getElementById('startForm').dataset.printVerified='true';setOcrStatus('Print de início aceito: origem, destino e carga identificados.','success');}
+  const entered={origem:document.getElementById('origin').value.trim(),destino:document.getElementById('destination').value.trim(),tipoCarga:document.getElementById('cargoType').value.trim()};
+  const manualMissing=Object.entries(entered).filter(([k,v])=>!v).map(([k])=>k);
+  if(missing.length && manualMissing.length){
+   startPrintValid=false;startOCRFields=null;
+   setOcrStatus('Leitura parcial. Confira e preencha os campos que faltam (origem, destino e tipo de carga). Depois clique em Ler print novamente para validar.','notice');
+  } else if(missing.length){
+   // Fallback: OCR parcial, mas os três campos foram confirmados/preenchidos pelo usuário.
+   startPrintValid=true;startOCRFields={...entered,formatoVerificado:true,ocrParcial:true,confirmacaoManual:true,ocrTexto:combined};
+   document.getElementById('startForm').dataset.printVerified='true';
+   setOcrStatus('OCR parcial: dados preenchidos. Confira origem, destino e carga; o print foi aceito com confirmação manual.','success');
+  } else {
+   startPrintValid=true;startOCRFields={origem:route[0],destino:route[1],tipoCarga:type,formatoVerificado:true,ocrTexto:combined};
+   document.getElementById('startForm').dataset.printVerified='true';setOcrStatus('Print de início aceito: origem, destino e carga identificados.','success');
+  }
 
  }catch(err){console.error('OCR:',err);setOcrStatus('Falha na análise: '+(err?.message||'erro desconhecido')+'. Preencha manualmente.','notice');}
  finally{btn.disabled=false;}
@@ -303,8 +333,8 @@ async function readFinishPrint(){
  try{await ensureOCRWorker();let all='';
   const main=document.createElement('canvas'),mctx=main.getContext('2d',{willReadFrequently:true});main.width=img.naturalWidth*1.5;main.height=img.naturalHeight*1.5;mctx.drawImage(img,0,0,main.width,main.height);const md=mctx.getImageData(0,0,main.width,main.height);for(let i=0;i<md.data.length;i+=4){const v=md.data[i]*.299+md.data[i+1]*.587+md.data[i+2]*.114;const n=Math.max(0,Math.min(255,(v-110)*1.6+110));md.data[i]=md.data[i+1]=md.data[i+2]=n;}mctx.putImageData(md,0,0);
   const crop=document.createElement('canvas'),cctx=crop.getContext('2d',{willReadFrequently:true});const sx=Math.round(img.naturalWidth*.195),sy=Math.round(img.naturalHeight*.39),sw=Math.round(img.naturalWidth*.55),sh=Math.round(img.naturalHeight*.29);crop.width=sw*3;crop.height=sh*3;cctx.drawImage(img,sx,sy,sw,sh,0,0,crop.width,crop.height);const cd=cctx.getImageData(0,0,crop.width,crop.height);for(let i=0;i<cd.data.length;i+=4){const v=cd.data[i]*.299+cd.data[i+1]*.587+cd.data[i+2]*.114;const n=Math.max(0,Math.min(255,(v-105)*1.8+105));cd.data[i]=cd.data[i+1]=cd.data[i+2]=n;}cctx.putImageData(cd,0,0);
-  const a=await ocrWorker.recognize(main),b=await ocrWorker.recognize(crop);all=(a.data.text||'')+'\n'+(b.data.text||'');const markers=countTerms(all,['distancia acionada','tempo gasto','combustivel','pena de dano','penalidade de tempo','renda total']);const values=extractFinishValues(all);
-  if(markers<1||!Number.isFinite(values.km)||values.km<=0||!Number.isFinite(values.reward)||values.reward<=0){rewardInput.readOnly=true;status.className='notice';status.textContent='PRINT RECUSADO: não reconheci distância e renda total. Confira se o print final está completo e nítido.';return;}
+  const a=await ocrWorker.recognize(main),b=await ocrWorker.recognize(crop);all=(a.data.text||'')+'\n'+(b.data.text||'');const markers=countTerms(all,['distancia','km','renda total','recompensa','penalidade','tempo gasto']);const values=extractFinishValues(all);
+  if(markers<1||!Number.isFinite(values.km)||values.km<=0||!Number.isFinite(values.reward)||values.reward<=0){rewardInput.readOnly=true;status.className='notice';status.textContent='Leitura incompleta: não consegui extrair com segurança distância e recompensa. Selecione novamente um print nítido e completo da tela de conclusão.';return;}
   finishPrintValid=true;finishOCRFields={kmFinal:values.km,rewardOCR:values.reward,formatoVerificado:true};rewardInput.value=values.reward;rewardInput.readOnly=true;status.className='success';status.textContent='Print de finalização aceito. Distância: '+values.km+' km · Renda total extraída: € '+values.reward.toLocaleString('pt-BR')+'. Valor bloqueado para edição.';
  }catch(err){status.className='notice';status.textContent='Falha na leitura OCR: '+err.message;finishPrintValid=false;finishOCRFields=null;rewardInput.value='';}
 }
