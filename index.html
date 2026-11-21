@@ -161,7 +161,7 @@ async function ensureOCRWorker(){
  if(!ocrWorker)ocrWorker=await Tesseract.createWorker('por+eng',1,{logger:m=>{if(m.status==='recognizing text')setOcrStatus('Analisando imagem: '+Math.round((m.progress||0)*100)+'%');},workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js',langPath:'https://tessdata.projectnaptha.com/4.0.0'});
  await ocrWorker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:'6'});return ocrWorker;
 }
-function screenRatioOk(img){const r=img.naturalWidth/img.naturalHeight;return r>=1.85&&r<=2.55;}
+function screenRatioOk(img){const r=img.naturalWidth/img.naturalHeight;return r>=1.60&&r<=2.60;}
 function countTerms(text,terms){const n=normalizeOCR(text).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();return terms.filter(t=>n.includes(t)).length;}
 function parseGameNumber(raw){if(!raw)return NaN;let s=String(raw).replace(/[^0-9.,-]/g,'').trim();if(!s)return NaN;if(s.includes(',')&&s.includes('.'))s=s.replace(/\./g,'').replace(',', '.');else if(s.includes(','))s=s.replace(',', '.');else if(/\.\d{3}$/.test(s))s=s.replace(/\./g,'');return Number(s);}
 function extractFinishValues(text){const norm=(text||'').replace(/\r/g,'');const lines=norm.split(/\n+/).map(x=>x.trim()).filter(Boolean);let km=NaN,reward=NaN;
@@ -300,12 +300,12 @@ async function readFinishPrint(){
  const file=document.getElementById('finishImage').files[0],status=document.getElementById('finishOCRStatus'),rewardInput=document.getElementById('reward');finishPrintValid=false;finishOCRFields=null;rewardInput.value='';status.style.display='block';status.className='notice';
  if(!file){status.textContent='Selecione o print de conclusão.';return;}
  const img=document.getElementById('finishPreview');if(!img.complete||!img.naturalWidth)await new Promise(resolve=>{img.onload=resolve;});
- if(!screenRatioOk(img)){status.textContent='PRINT RECUSADO: formato fora do padrão horizontal do jogo.';return;}
+ if(!screenRatioOk(img)){status.textContent='PRINT RECUSADO: formato fora do padrão horizontal do jogo. Envie a captura original, sem recortar ou editar.';return;}
  try{await ensureOCRWorker();let all='';
   const main=document.createElement('canvas'),mctx=main.getContext('2d',{willReadFrequently:true});main.width=img.naturalWidth*1.5;main.height=img.naturalHeight*1.5;mctx.drawImage(img,0,0,main.width,main.height);const md=mctx.getImageData(0,0,main.width,main.height);for(let i=0;i<md.data.length;i+=4){const v=md.data[i]*.299+md.data[i+1]*.587+md.data[i+2]*.114;const n=Math.max(0,Math.min(255,(v-110)*1.6+110));md.data[i]=md.data[i+1]=md.data[i+2]=n;}mctx.putImageData(md,0,0);
   const crop=document.createElement('canvas'),cctx=crop.getContext('2d',{willReadFrequently:true});const sx=Math.round(img.naturalWidth*.195),sy=Math.round(img.naturalHeight*.39),sw=Math.round(img.naturalWidth*.55),sh=Math.round(img.naturalHeight*.29);crop.width=sw*3;crop.height=sh*3;cctx.drawImage(img,sx,sy,sw,sh,0,0,crop.width,crop.height);const cd=cctx.getImageData(0,0,crop.width,crop.height);for(let i=0;i<cd.data.length;i+=4){const v=cd.data[i]*.299+cd.data[i+1]*.587+cd.data[i+2]*.114;const n=Math.max(0,Math.min(255,(v-105)*1.8+105));cd.data[i]=cd.data[i+1]=cd.data[i+2]=n;}cctx.putImageData(cd,0,0);
   const a=await ocrWorker.recognize(main),b=await ocrWorker.recognize(crop);all=(a.data.text||'')+'\n'+(b.data.text||'');const markers=countTerms(all,['distancia acionada','tempo gasto','combustivel','pena de dano','penalidade de tempo','renda total']);const values=extractFinishValues(all);
-  if(markers<5||!Number.isFinite(values.km)||values.km<=0||!Number.isFinite(values.reward)||values.reward<=0){rewardInput.readOnly=true;status.className='notice';status.textContent='PRINT RECUSADO: não reconheci os dados necessários na tela de conclusão. Use o print original correto.';return;}
+  if(markers<3||!Number.isFinite(values.km)||values.km<=0||!Number.isFinite(values.reward)||values.reward<=0){rewardInput.readOnly=true;status.className='notice';status.textContent='PRINT RECUSADO: não reconheci os dados necessários na tela de conclusão. Use o print original correto.';return;}
   finishPrintValid=true;finishOCRFields={kmFinal:values.km,rewardOCR:values.reward,formatoVerificado:true};rewardInput.value=values.reward;rewardInput.readOnly=true;status.className='success';status.textContent='Print de finalização aceito. Distância: '+values.km+' km · Renda total extraída: € '+values.reward.toLocaleString('pt-BR')+'. Valor bloqueado para edição.';
  }catch(err){status.className='notice';status.textContent='Falha na leitura OCR: '+err.message;finishPrintValid=false;finishOCRFields=null;rewardInput.value='';}
 }
